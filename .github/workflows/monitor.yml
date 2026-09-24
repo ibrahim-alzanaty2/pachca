@@ -1,0 +1,38 @@
+name: MCP resource monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # GitHub's minimum schedule interval
+  workflow_dispatch:         # lets you start it manually from the Actions tab
+
+permissions:
+  contents: write            # needed to commit resource.txt
+
+concurrency:
+  group: mcp-monitor
+  cancel-in-progress: false  # never run two at once
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 5 checks, one per minute, then exit (~4 minutes total)
+      - name: Check MCP resource
+        run: python monitor_resource.py --runs 5
+
+      - name: Commit resource.txt if it changed
+        run: |
+          if [ -n "$(git status --porcelain resource.txt)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add resource.txt
+            git commit -m "Update resource value"
+            git push
+          fi
